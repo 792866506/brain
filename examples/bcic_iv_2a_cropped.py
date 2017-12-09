@@ -100,10 +100,11 @@ def run_exp(data_folder, subject_id, low_cut_hz, model, cuda):
     if model == 'shallow':
         model = ShallowFBCSPNet(n_chans, n_classes, input_time_length=input_time_length,
                             final_conv_length=30).create_network()
+        to_dense_prediction_model(model)
     elif model == 'deep':
         model = Deep4Net(n_chans, n_classes, input_time_length=input_time_length,
                             final_conv_length=2).create_network()
-
+        to_dense_prediction_model(model)
     elif model== 'deep_dense':
         model = DeepDenseNet(in_chans= n_chans,
                      n_classes = n_classes,
@@ -117,7 +118,6 @@ def run_exp(data_folder, subject_id, low_cut_hz, model, cuda):
                      bn_size=4, 
                      drop_rate=0.5, 
                  ).create_network()
-    to_dense_prediction_model(model)
     if cuda:
         model.cuda()
 
@@ -135,12 +135,14 @@ def run_exp(data_folder, subject_id, low_cut_hz, model, cuda):
                                        input_time_length=input_time_length,
                                        n_preds_per_input=n_preds_per_input)
 
-    stop_criterion = Or([MaxEpochs(800),
-                         NoDecrease('valid_misclass', 80)])
-
+    stop_criterion = Or([MaxEpochs(400),
+                         NoDecrease('valid_misclass', 100)])
+    '''
     monitors = [LossMonitor(), MisclassMonitor(col_suffix='sample_misclass'),
                 CroppedTrialMisclassMonitor(
                     input_time_length=input_time_length), RuntimeMonitor()]
+    '''
+    monitors = [LossMonitor(), MisclassMonitor(), RuntimeMonitor()]
 
     model_constraint = MaxNormDefaultConstraint()
 
@@ -155,18 +157,19 @@ def run_exp(data_folder, subject_id, low_cut_hz, model, cuda):
                      remember_best_column='valid_misclass',
                      run_after_early_stop=True, cuda=cuda)
     exp.run()
-return exp
+    return exp
 
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s %(levelname)s : %(message)s',
                         level=logging.DEBUG, stream=sys.stdout)
     # Should contain both .gdf files and .mat-labelfiles from competition
     data_folder = '/home/al/BCICIV_2a_gdf/'
-    subject_id = 8 # 1-9
+    subject_id = 1 # 1-9
     low_cut_hz = 0 # 0 or 4
-    model = 'deep' #'shallow' or 'deep'
+    model = 'deep_dense' #'shallow' or 'deep'
     cuda = True
     exp = run_exp(data_folder, subject_id, low_cut_hz, model, cuda)
     log.info("Last 10 epochs")
     log.info("\n" + str(exp.epochs_df.iloc[-10:]))
     print np.mean(exp.epochs_df.iloc[-10:]['test_misclass'])
+    print np.min(exp.epochs_df.iloc[-10:]['test_misclass'])

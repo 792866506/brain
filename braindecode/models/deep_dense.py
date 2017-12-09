@@ -113,7 +113,7 @@ class DeepDenseNet(object):
             n_out_time = out.size()[2]
             self.final_conv_length = n_out_time
         else :
-            n_cur_filters = 200
+            n_cur_filters = 100
             
         model.add_module('conv_classifier',
                              nn.Conv2d(n_cur_filters, self.n_classes,

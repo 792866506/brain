@@ -38,11 +38,11 @@ from models.deep_dense import DeepDenseNet
 log = logging.getLogger(__name__)
 log_dir=None#'runs/model1' #None
 comment = 'dense'
-n_epoch = 100
-model = 'deep_dense' #'shallow' or 'deep'
+n_epoch = 150
+model = 'deep' #'shallow' or 'deep'
 cuda = True
 exp_stand = True
-subject_id = 1 # 1-9
+subject_id = 3 # 1-9
 low_cut_hz = 0 # 0 or 4
 high_cut_hz = 38
 data_folder = '/home/al/BCICIV_2a_gdf/'
@@ -145,16 +145,10 @@ elif model == 'deep_dense':
     model = DeepDenseNet(in_chans= n_chans,
                  n_classes = n_classes,
                  input_time_length= input_time_length,
-                 n_first_filters = 25,
-                 final_conv_length=3,
-                 first_filter_length=3,
-                 nonlinearity=elu,
-                 split_first_layer=True,
-                 batch_norm_alpha=0.1,
-                 bn_size=4, 
-                 drop_rate=0.5, 
-             ).create_network()
-    to_dense_prediction_model(model)
+                  final_conv_length=2,
+                 bn_size=2, 
+                 ).create_network()
+    #to_dense_prediction_model(model)
 
 
 def _set_lr(optimizer, epoch, n_epochs, lr):

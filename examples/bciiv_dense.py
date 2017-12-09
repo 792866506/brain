@@ -45,7 +45,7 @@ logging.basicConfig(format='%(asctime)s %(levelname)s : %(message)s',
 data_folder = '/home/al/BCICIV_2a_gdf/'
 subject_id = 8 # 1-9
 low_cut_hz = 0 # 0 or 4
-model = 'deep' #'shallow' or 'deep'
+model = 'deep_dense' #'shallow' or 'deep'
 cuda = True
 exp_std =True
 pca=False
@@ -153,15 +153,9 @@ elif model == 'deep_dense':
     model = DeepDenseNet(in_chans= n_chans,
                  n_classes = n_classes,
                  input_time_length= input_time_length,
-                 n_first_filters = 25,
-                 final_conv_length='auto',
-                 first_filter_length=3,
-                 nonlinearity=elu,
-                 split_first_layer=True,
-                 batch_norm_alpha=0.1,
-                 bn_size=4, 
-                 drop_rate=0.5, 
-             ).create_network()
+                  final_conv_length='auto',
+                 bn_size=2, 
+                 ).create_network()
 if cuda:
     model.cuda()
 log.info("Model: \n{:s}".format(str(model)))
@@ -177,9 +171,9 @@ rng = RandomState((2017,6,30))
 train_accu=[]
 test_accu=[]
 
-for i_epoch in range(90):
+for i_epoch in range(200):
     i_trials_in_batch = get_balanced_batches(len(train_set.X), rng, shuffle=True,
-                                           batch_size=64)
+                                           batch_size=60)
     # Set model to training mode
     model.train()
     for i_trials in i_trials_in_batch :
@@ -214,7 +208,7 @@ for i_epoch in range(90):
     all_losses = []
     batch_sizes = []
     i_trials_in_batch = get_balanced_batches(len(dataset.X), rng, shuffle=True,
-                                        batch_size=64)
+                                        batch_size=200)
     for i_trials in i_trials_in_batch:
         batch_X = dataset.X[i_trials][:,:,:,None]
         batch_y = dataset.y[i_trials]
@@ -254,7 +248,7 @@ for i_epoch in range(90):
     all_losses = []
     batch_sizes = []
     i_trials_in_batch = get_balanced_batches(len(dataset.X), rng, shuffle=True,
-                                        batch_size=64)
+                                        batch_size=200)
     for i_trials in i_trials_in_batch:
         batch_X = dataset.X[i_trials][:,:,:,None]
         batch_y = dataset.y[i_trials]
