@@ -28,15 +28,17 @@ pkl_file = open('/home/al/braindecode/data/phys/test_set.pkl', 'rb')
 test_set = pickle.load(pkl_file)
 pkl_file.close()
 
-
+'''
 from sklearn.decomposition import FastICA, PCA
 data= np.concatenate((train_set.X,test_set.X)).transpose(0,2,1).reshape((-1,64))
 data = exponential_running_standardize(data)
 pca=PCA(n_components='mle',copy=True)  
 newData=pca.fit_transform(data) 
 '''
+'''
 ica = FastICA()
 newData = ica.fit_transform(newData)  # 重构信号 
+'''
 '''
 newData = newData.reshape(train_set.X.shape[0]+test_set.X.shape[0],-1,newData.shape[1])
 newData = newData.transpose(0,2,1)
@@ -46,7 +48,7 @@ newData = newData.transpose(0,2,1)
 train_set.X=(newData[:train_set.X.shape[0]]).astype('float32')
 test_set.X=(newData[train_set.X.shape[0]:]).astype('float32')
 
-
+'''
 
 
 
@@ -69,7 +71,7 @@ model = EEGDenseNet(in_chans = in_chans,
                  n_classes = n_classes,
                  input_time_length = input_time_length,
                  final_pool_length= 'auto',
-                 first_filter_length=5,
+                 first_filter_length=15,
                  nonlinearity=elu,
                  split_first_layer=True,
                  batch_norm_alpha=0.1,
@@ -115,7 +117,7 @@ rng = RandomState((2017,6,30))
 train_accu=[]
 test_accu=[]
 
-for i_epoch in range(80):
+for i_epoch in range(50):
     i_trials_in_batch = get_balanced_batches(len(train_set.X), rng, shuffle=True,
                                            batch_size=50)
     # Set model to training mode

@@ -8,7 +8,8 @@ import numpy as np
 import torch.nn.functional as F
 from torch import optim
 import torch as th
-
+from torch.nn.functional import elu
+from torch.nn.functional import relu
 from braindecode.models.deep4 import Deep4Net
 from braindecode.models.util import to_dense_prediction_model
 from braindecode.datasets.bcic_iv_2a import BCICompetition4Set2A
@@ -28,6 +29,12 @@ from braindecode.datautil.trial_segment import create_signal_target_from_raw_mne
 
 log = logging.getLogger(__name__)
 
+
+from tensorboardX import SummaryWriter
+sys.path.insert(0,'/home/al/braindecode/code/braindecode/braindecode')
+from models.eeg_densenet import EEGDenseNet
+from models.eeg_resnet import EEGResNet
+from models.deep_dense import DeepDenseNet
 
 def run_exp(data_folder, subject_id, low_cut_hz, model, cuda):
     train_filename = 'A{:02d}T.gdf'.format(subject_id)
@@ -75,8 +82,8 @@ def run_exp(data_folder, subject_id, low_cut_hz, model, cuda):
                                                   eps=1e-4).T,
         test_cnt)
 
-    marker_def = OrderedDict([('Left Hand', [1]), ('Right Hand', [2],),])
-                             # ('Foot', [3]), ('Tongue', [4])])
+    marker_def = OrderedDict([('Left Hand', [1]), ('Right Hand', [2],),
+                              ('Foot', [3]), ('Tongue', [4])])
     ival = [-500, 4000]
 
     train_set = create_signal_target_from_raw_mne(train_cnt, marker_def, ival)
@@ -87,7 +94,7 @@ def run_exp(data_folder, subject_id, low_cut_hz, model, cuda):
 
     set_random_seeds(seed=20190706, cuda=cuda)
 
-    n_classes = 2
+    n_classes = 4
     n_chans = int(train_set.X.shape[1])
     input_time_length=1000
     if model == 'shallow':
@@ -97,7 +104,19 @@ def run_exp(data_folder, subject_id, low_cut_hz, model, cuda):
         model = Deep4Net(n_chans, n_classes, input_time_length=input_time_length,
                             final_conv_length=2).create_network()
 
-
+    elif model== 'deep_dense':
+        model = DeepDenseNet(in_chans= n_chans,
+                     n_classes = n_classes,
+                     input_time_length= input_time_length,
+                     n_first_filters = 25,
+                     final_conv_length=2,
+                     first_filter_length=3,
+                     nonlinearity=elu,
+                     split_first_layer=True,
+                     batch_norm_alpha=0.1,
+                     bn_size=4, 
+                     drop_rate=0.5, 
+                 ).create_network()
     to_dense_prediction_model(model)
     if cuda:
         model.cuda()
@@ -116,7 +135,7 @@ def run_exp(data_folder, subject_id, low_cut_hz, model, cuda):
                                        input_time_length=input_time_length,
                                        n_preds_per_input=n_preds_per_input)
 
-    stop_criterion = Or([MaxEpochs(100),
+    stop_criterion = Or([MaxEpochs(800),
                          NoDecrease('valid_misclass', 80)])
 
     monitors = [LossMonitor(), MisclassMonitor(col_suffix='sample_misclass'),
@@ -136,17 +155,18 @@ def run_exp(data_folder, subject_id, low_cut_hz, model, cuda):
                      remember_best_column='valid_misclass',
                      run_after_early_stop=True, cuda=cuda)
     exp.run()
-    return exp
+return exp
 
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s %(levelname)s : %(message)s',
                         level=logging.DEBUG, stream=sys.stdout)
     # Should contain both .gdf files and .mat-labelfiles from competition
     data_folder = '/home/al/BCICIV_2a_gdf/'
-    subject_id = 1 # 1-9
-    low_cut_hz = 4 # 0 or 4
+    subject_id = 8 # 1-9
+    low_cut_hz = 0 # 0 or 4
     model = 'deep' #'shallow' or 'deep'
     cuda = True
     exp = run_exp(data_folder, subject_id, low_cut_hz, model, cuda)
     log.info("Last 10 epochs")
     log.info("\n" + str(exp.epochs_df.iloc[-10:]))
+    print np.mean(exp.epochs_df.iloc[-10:]['test_misclass'])

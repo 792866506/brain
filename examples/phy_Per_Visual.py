@@ -9,7 +9,11 @@ import mne
 import numpy as np
 from mne.io import concatenate_raws
 from braindecode.datautil.signal_target import SignalAndTarget
-
+import  sys
+sys.path.insert(0,'/home/al/braindecode/code/braindecode/braindecode')
+from models.deep_dense import DeepDenseNet
+from torch.nn.functional import elu
+from torch.nn.functional import relu
 # First 50 subjects as train
 physionet_paths = [ mne.datasets.eegbci.load_data(sub_id,[4,8,12,]) for sub_id in range(1,51)]
 physionet_paths = np.concatenate(physionet_paths)
@@ -65,13 +69,27 @@ set_random_seeds(seed=20170629, cuda=cuda)
 # This will determine how many crops are processed in parallel
 input_time_length = 450
 # final_conv_length determines the size of the receptive field of the ConvNet
+'''
 model = Deep4Net(in_chans=64, n_classes=2, input_time_length=input_time_length,
                  filter_length_3=5, filter_length_4=5,
                  pool_time_stride=2,
                  stride_before_pool=True,
                         final_conv_length=1).create_network()
 to_dense_prediction_model(model)
-
+'''
+model = DeepDenseNet(in_chans= 64,
+                 n_classes = 2,
+                 input_time_length= input_time_length,
+                 n_first_filters = 25,
+                 final_conv_length=2,
+                 first_filter_length=3,
+                 nonlinearity=elu,
+                 split_first_layer=True,
+                 batch_norm_alpha=0.1,
+                 bn_size=4, 
+                 drop_rate=0.5, 
+             ).create_network()
+to_dense_prediction_model(model)
 if cuda:
     model.cuda()
 

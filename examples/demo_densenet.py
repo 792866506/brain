@@ -16,7 +16,7 @@ import  sys
 sys.path.insert(0,'/home/al/braindecode/code/braindecode/braindecode')
 from models.eeg_densenet import EEGDenseNet
 from models.eeg_resnet import EEGResNet
-
+from models.deep_dense import DeepDenseNet
 # First 50 subjects as train
 physionet_paths = [ mne.datasets.eegbci.load_data(sub_id,[4,8,12,]) for sub_id in range(1,31)]#(1,51)
 physionet_paths = np.concatenate(physionet_paths)
@@ -24,6 +24,7 @@ parts = [mne.io.read_raw_edf(path, preload=True,stim_channel='auto')
          for path in physionet_paths]
 
 raw = concatenate_raws(parts)
+#raw = raw.drop_channels(  )
 
 picks = mne.pick_types(raw.info, meg=False, eeg=True, stim=False, eog=False,
                    exclude='bads')
@@ -37,28 +38,6 @@ epoched = mne.Epochs(raw, events, dict(left=2, right=3,), tmin=1, tmax=4.1, proj
 
 train_X = (epoched.get_data() * 1e6).astype(np.float32)
 train_y = (epoched.events[:,2] - 2).astype(np.int64) #2,3 -> 0,1
-
-
-physionet_paths = [ mne.datasets.eegbci.load_data(sub_id,[6,10,14]) for sub_id in range(1,31)]#(1,51)
-physionet_paths = np.concatenate(physionet_paths)
-parts = [mne.io.read_raw_edf(path, preload=True,stim_channel='auto')
-         for path in physionet_paths]
-
-raw = concatenate_raws(parts)
-
-picks = mne.pick_types(raw.info, meg=False, eeg=True, stim=False, eog=False,
-                   exclude='bads')
-
-events = mne.find_events(raw, shortest_event=0, stim_channel='STI 014')
-
-# Read epochs (train will be done only between 1 and 2s)
-# Testing will be done with a running classifier
-epoched = mne.Epochs(raw, events, dict( feet=3,), tmin=1, tmax=4.1, proj=False, picks=picks,
-                baseline=None, preload=True)
-
-train_X = np.concatenate((train_X , (epoched.get_data() * 1e6).astype(np.float32)),axis=0)
-train_y = np.concatenate( (  train_y , (epoched.events[:,2]-1).astype(np.int64) ),axis=0)
-
 
 # Next 5 subjects as test
 physionet_paths_test = [mne.datasets.eegbci.load_data(sub_id,[4,8,12,]) for sub_id in range(31,36)]#51,56
@@ -81,26 +60,6 @@ test_X = (epoched_test.get_data() * 1e6).astype(np.float32)
 test_y = (epoched_test.events[:,2] - 2).astype(np.int64) #2,3 -> 0,1
 
 
-physionet_paths_test = [mne.datasets.eegbci.load_data(sub_id,[6,10,14,]) for sub_id in range(31,36)]#51,56
-physionet_paths_test = np.concatenate(physionet_paths_test)
-parts_test = [mne.io.read_raw_edf(path, preload=True,stim_channel='auto')
-         for path in physionet_paths_test]
-raw_test = concatenate_raws(parts_test)
-
-picks_test = mne.pick_types(raw_test.info, meg=False, eeg=True, stim=False, eog=False,
-                   exclude='bads')
-
-events_test = mne.find_events(raw_test, shortest_event=0, stim_channel='STI 014')
-
-# Read epochs (train will be done only between 1 and 2s)
-# Testing will be done with a running classifier
-epoched_test = mne.Epochs(raw_test, events_test, dict(feet=3), tmin=1, tmax=4.1, proj=False, picks=picks_test,
-                baseline=None, preload=True)
-
-test_X = np.concatenate((test_X , (epoched_test.get_data() * 1e6).astype(np.float32)),axis=0)
-test_y = np.concatenate( (  test_y , (epoched_test.events[:,2]-1).astype(np.int64) ),axis=0)
-
-
 train_set = SignalAndTarget(train_X, y=train_y)
 test_set = SignalAndTarget(test_X, y=test_y)
 
@@ -115,7 +74,6 @@ pkl_file = open('/home/al/braindecode/data/phys/test_set.pkl', 'rb')
 test_set = pickle.load(pkl_file)
 pkl_file.close()
 '''
-n_classes = 3
 in_chans = train_set.X.shape[1]
 input_time_length = train_set.X.shape[2]
 input_time_length=497
@@ -130,21 +88,19 @@ from torch.nn.functional import relu
 cuda = True
 set_random_seeds(seed=20170629, cuda=cuda)
 
-model = EEGDenseNet(in_chans = in_chans,
-                 n_classes = n_classes,
-                 input_time_length = input_time_length,
-                 final_pool_length= 'auto',
-                 first_filter_length=5,
+model = DeepDenseNet(in_chans= 64,
+                 n_classes = 2,
+                 input_time_length= input_time_length,
+                 n_first_filters = 25,
+                 final_conv_length='auto',
+                 first_filter_length=3,
                  nonlinearity=elu,
                  split_first_layer=True,
                  batch_norm_alpha=0.1,
-                 growth_rate=20, 
                  bn_size=4, 
                  drop_rate=0.5, 
-                 block_config=(4, 4, 4),#2 2 2 2 2 2   50
-                 compression=0.5,
-                 num_init_features=24, 
-                 ).create_network()
+             ).create_network()
+to_dense_prediction_model(model)
 '''
 model = EEGResNet( in_chans = in_chans,
                  n_classes = n_classes,
@@ -304,7 +260,7 @@ for i_epoch in range(30):
 train_accu2=train_accu
 test_accu2=test_accu 
 '''
-def plot_accu(train_accu=train_accu,test_accu=test_accu,a=20):
+def plot_accu(train_accu=train_accu,test_accu=test_accu,a=100):
     import matplotlib.pyplot as plt
     plt.figure('accu')
     plt.xlabel('epoch')

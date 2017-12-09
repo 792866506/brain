@@ -21,25 +21,28 @@ from braindecode.models.deep4 import Deep4Net
 from braindecode.datasets.bcic_iv_2a import BCICompetition4Set2A
 from braindecode.datautil.iterators import CropsFromTrialsIterator
 from braindecode.models.shallow_fbcsp import ShallowFBCSPNet
-
+from braindecode.models.util import to_dense_prediction_model
 from braindecode.torch_ext.util import set_random_seeds, np_to_var ,var_to_np
 from braindecode.mne_ext.signalproc import mne_apply
 from braindecode.datautil.signalproc import (bandpass_cnt,
                                              exponential_running_standardize)
 from braindecode.datautil.trial_segment import create_signal_target_from_raw_mne
 
+from tensorboardX import SummaryWriter
 
 import  sys
 sys.path.insert(0,'/home/al/braindecode/code/braindecode/braindecode')
 from models.eeg_densenet import EEGDenseNet
 from models.eeg_resnet import EEGResNet
+from models.deep_dense import DeepDenseNet
 log = logging.getLogger(__name__)
-
-
-model = 'dense' #'shallow' or 'deep'
+log_dir=None#'runs/model1' #None
+comment = 'dense'
+n_epoch = 100
+model = 'deep_dense' #'shallow' or 'deep'
 cuda = True
 exp_stand = True
-subject_id = 7 # 1-9
+subject_id = 1 # 1-9
 low_cut_hz = 0 # 0 or 4
 high_cut_hz = 38
 data_folder = '/home/al/BCICIV_2a_gdf/'
@@ -94,12 +97,12 @@ if  exp_stand==True:
                                                   eps=1e-4).T,
         test_cnt)
 
-'''
+
 marker_def = OrderedDict([('Left Hand', [1]), ('Right Hand', [2],),
                           ('Foot', [3]), ('Tongue', [4])])
 '''
 marker_def = OrderedDict([('Left Hand', [1]), ('Right Hand', [2],)])
-
+'''
 ival = [-500, 4000]
 
 train_set = create_signal_target_from_raw_mne(train_cnt, marker_def, ival)
@@ -116,10 +119,11 @@ input_time_length=1000
 if model == 'shallow':
     model = ShallowFBCSPNet(n_chans, n_classes, input_time_length=input_time_length,
                             final_conv_length=30).create_network()
+    to_dense_prediction_model(model)
 elif model == 'deep':
     model = Deep4Net(n_chans, n_classes, input_time_length=input_time_length,
                             final_conv_length=2).create_network()
-
+    to_dense_prediction_model(model)
 elif model == 'dense':
     model = EEGDenseNet(in_chans = n_chans,
              n_classes = n_classes,
@@ -129,14 +133,41 @@ elif model == 'dense':
              nonlinearity=elu,
              split_first_layer=True,
              batch_norm_alpha=0.1,
-             growth_rate=10, 
+             growth_rate=20, 
              bn_size=4, 
              drop_rate=0.5, 
-             block_config=(2,2,2,2,2),#2 2 2 2 2 2   50
+             block_config=(3,2),#2 2 2 2 2 2   50
              compression=0.5,
-             num_init_features=10, 
+             num_init_features=20, 
              ).create_network()
-#to_dense_prediction_model(model)
+    
+elif model == 'deep_dense':
+    model = DeepDenseNet(in_chans= n_chans,
+                 n_classes = n_classes,
+                 input_time_length= input_time_length,
+                 n_first_filters = 25,
+                 final_conv_length=3,
+                 first_filter_length=3,
+                 nonlinearity=elu,
+                 split_first_layer=True,
+                 batch_norm_alpha=0.1,
+                 bn_size=4, 
+                 drop_rate=0.5, 
+             ).create_network()
+    to_dense_prediction_model(model)
+
+
+def _set_lr(optimizer, epoch, n_epochs, lr):
+    lr = lr
+    if float(epoch) / n_epochs > 0.75:
+        lr = lr * 0.01
+    elif float(epoch) / n_epochs > 0.5:
+        lr = lr * 0.1
+
+    for param_group in optimizer.param_groups:
+        param_group['lr'] = lr
+        print(param_group['lr'])
+
 if cuda:
     model.cuda()
 
@@ -151,8 +182,7 @@ print("{:d} predictions per input/trial".format(n_preds_per_input))
 
 
 optimizer = optim.Adam(model.parameters())
-
-iterator = CropsFromTrialsIterator(batch_size=100,
+iterator = CropsFromTrialsIterator(batch_size=64,
                                    input_time_length=input_time_length,
                                    n_preds_per_input=n_preds_per_input)
 
@@ -162,9 +192,11 @@ from braindecode.datautil.iterators import get_balanced_batches
 rng = RandomState((2017,6,30))
 train_accu=[]
 test_accu=[]
-#aa=time.time()
 
-for i_epoch in range(100):#origin 20
+
+#########################################################
+writer = SummaryWriter(log_dir,comment=comment)
+for i_epoch in range(n_epoch):#origin 20
     print("Epoch {:d}".format(i_epoch))
     print("Train....")
     # Set model to training mode
@@ -228,7 +260,10 @@ for i_epoch in range(100):#origin 20
         setname, accuracy * 100))
     train_accu.append(accuracy)
     
-    
+    writer.add_scalars('data/loss', {"train_loss":loss,
+                                      }, i_epoch)
+    writer.add_scalars('data/accu', {  "train_accu":accuracy,
+                                     }, i_epoch)
     
     setname='Test'
     dataset=test_set              
@@ -266,74 +301,13 @@ for i_epoch in range(100):#origin 20
     print("{:6s} Accuracy: {:.1f}%".format(
         setname, accuracy * 100))
     test_accu.append(accuracy)
-   
-
-def plot_accu(train_accu=train_accu,test_accu=test_accu,a=100):
-    import matplotlib.pyplot as plt
-    plt.figure('accu')
-    plt.xlabel('epoch')
-    plt.ylabel('loss & accu')
-    plt.yticks(np.linspace(0,1,num=30))
-    plt.plot(range(a),train_accu[:a],'b.-',label='train',)
-    plt.plot( range(a),test_accu[:a],'r.-',label='test')
-    
-
-    max_indx=np.argmax(test_accu)#max value index
-    plt.plot(max_indx,test_accu[max_indx],'ks')
-    show_max=str(max_indx)+' '+str(test_accu[max_indx])
-    plt.annotate(show_max,xytext=(max_indx,test_accu[max_indx]),
-                 xy=(max_indx,test_accu[max_indx]))
-    plt.legend()
-    plt.show()
-
-
-   
-def ploy_accu2(train_accu,test_accu,
-               train_accu2,test_accu2,a=80):
-    import matplotlib.pyplot as plt
-    plt.figure()#figsize=(8,8))
-    plt.xlabel('epoch')
-    plt.ylabel('loss & accu')
-    plt.yticks(np.linspace(0,1,num=30))
-    plt.plot(range(a),train_accu[:a],'b.-',label='train',)
-    plt.plot( range(a),test_accu[:a],'r.-',label='test')
-    plt.plot(range(a),train_accu2[:a],'.-',color='royalblue',label='train2',)
-    plt.plot( range(a),test_accu2[:a],'.-',color='deeppink',label='test2')
-
-    max_indx=np.argmax(test_accu)#max value index
-    plt.plot(max_indx,test_accu[max_indx],'ks')
-    show_max=str(max_indx)+'*'+str(test_accu[max_indx])
-    plt.annotate(show_max,xytext=(max_indx,test_accu[max_indx]),
-                 xy=(max_indx,test_accu[max_indx]))
-    
-    max_indx=np.argmax(test_accu2)#max value index
-    plt.plot(max_indx,test_accu2[max_indx],'ks')
-    show_max=str(max_indx)+'*'+str(test_accu2[max_indx])
-    plt.annotate(show_max,xytext=(max_indx,test_accu2[max_indx]),
-                 xy=(max_indx,test_accu2[max_indx]))
-    
-    plt.legend()
-    plt.show()
-    
-#plot_accu2(train_accu,test_accu,train_accu2,test_accu2,a=80)         
-''' 
-          
-a=80
-import matplotlib.pyplot as plt
-plt.figure('accu')
-plt.xlabel('epoch')
-plt.ylabel('loss & accu')
-plt.yticks(np.linspace(0,1,num=30))
-plt.plot(range(a),train_accu[:a],'b.-',label='train',)
-plt.plot( range(a),test_accu[:a],'r.-',label='test')
-plt.plot(range(a),train_accu2[:a],'b.-',label='train2',)
-plt.plot( range(a),test_accu2[:a],'k.-',label='test2')
-plt.legend()
-plt.show()  
-
-     
-        
-
-#train_accu2=train_accu
-#test_accu2=test_accu
-'''
+    ###################################
+    writer.add_scalars('data/loss', {"test_loss":loss,
+                                      }, i_epoch)
+    writer.add_scalars('data/accu', {  "test_accu":accuracy,
+                                     }, i_epoch)
+########################
+writer.add_graph(model, outputs.cpu())   
+#writer.export_scalars_to_json("./all_scalars.json")
+writer.save_txt(str(model),'model1.txt')
+writer.close()

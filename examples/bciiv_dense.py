@@ -35,6 +35,7 @@ import  sys
 sys.path.insert(0,'/home/al/braindecode/code/braindecode/braindecode')
 from models.eeg_densenet import EEGDenseNet
 from models.eeg_resnet import EEGResNet
+from models.deep_dense import DeepDenseNet
 log = logging.getLogger(__name__)
 
 
@@ -42,11 +43,11 @@ logging.basicConfig(format='%(asctime)s %(levelname)s : %(message)s',
                         level=logging.DEBUG, stream=sys.stdout)
     # Should contain both .gdf files and .mat-labelfiles from competition
 data_folder = '/home/al/BCICIV_2a_gdf/'
-subject_id = 1 # 1-9
+subject_id = 8 # 1-9
 low_cut_hz = 0 # 0 or 4
-model = 'dense' #'shallow' or 'deep'
+model = 'deep' #'shallow' or 'deep'
 cuda = True
-exp_std =False
+exp_std =True
 pca=False
 
 
@@ -111,8 +112,8 @@ if pca:
         lambda a: pca.fit_transform(a.T).T,
         test_cnt)      
 
-marker_def = OrderedDict([('Left Hand', [1]), ('Right Hand', [2],),])
-                       #   ('Foot', [3]), ('Tongue', [4])])
+marker_def = OrderedDict([('Left Hand', [1]), ('Right Hand', [2],),
+                         ('Foot', [3]), ('Tongue', [4])])
 ival = [-500, 4000]
 
 train_set = create_signal_target_from_raw_mne(train_cnt, marker_def, ival)
@@ -121,7 +122,7 @@ test_set = create_signal_target_from_raw_mne(test_cnt, marker_def, ival)
 
 set_random_seeds(seed=20190706, cuda=cuda)
 
-n_classes = 2
+n_classes = len(marker_def)
 n_chans = int(train_set.X.shape[1])
 input_time_length = train_set.X.shape[2]
 if model == 'shallow':
@@ -147,6 +148,20 @@ elif model == 'dense':
              num_init_features=25, 
              ).create_network()
     
+    
+elif model == 'deep_dense':
+    model = DeepDenseNet(in_chans= n_chans,
+                 n_classes = n_classes,
+                 input_time_length= input_time_length,
+                 n_first_filters = 25,
+                 final_conv_length='auto',
+                 first_filter_length=3,
+                 nonlinearity=elu,
+                 split_first_layer=True,
+                 batch_norm_alpha=0.1,
+                 bn_size=4, 
+                 drop_rate=0.5, 
+             ).create_network()
 if cuda:
     model.cuda()
 log.info("Model: \n{:s}".format(str(model)))
