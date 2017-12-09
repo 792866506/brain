@@ -37,7 +37,7 @@ class DeepDenseNet(object):
                  nonlinearity=elu,
                  split_first_layer=True,
                  batch_norm_alpha=0.1,
-                 bn_size=4, 
+                 bn_size=2, 
                  drop_rate=0.5, 
                  ):
         if final_conv_length == 'auto':
@@ -47,6 +47,7 @@ class DeepDenseNet(object):
         del self.self
 
     def create_network(self):
+        conv_length = 7
         bn_size = self.bn_size
         drop_rate = self.drop_rate
         model = nn.Sequential()
@@ -86,7 +87,7 @@ class DeepDenseNet(object):
                              
         n_filters_conv = self.n_first_filters
         model.add_module('2_DenseLayer',_DenseLayer(n_filters_conv,50,bn_size, 
-                 drop_rate, conv_length = 11 ))
+                 drop_rate, conv_length = conv_length ))
         
         model.add_module('pool2',nn.MaxPool2d(
                              kernel_size=(self.pool_time_length, 1),stride=(3, 1)))
@@ -94,7 +95,7 @@ class DeepDenseNet(object):
                              ))
         
         model.add_module('3_DenseLayer',_DenseLayer(n_filters_conv+50,100,bn_size, 
-                 drop_rate, conv_length = 11 ))
+                 drop_rate, conv_length = conv_length ))
         
         model.add_module('1_Transition',
                          _Transition(175, 100))

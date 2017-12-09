@@ -137,13 +137,13 @@ def run_exp(data_folder, subject_id, low_cut_hz, model, cuda):
 
     stop_criterion = Or([MaxEpochs(400),
                          NoDecrease('valid_misclass', 100)])
-    '''
+    
     monitors = [LossMonitor(), MisclassMonitor(col_suffix='sample_misclass'),
                 CroppedTrialMisclassMonitor(
                     input_time_length=input_time_length), RuntimeMonitor()]
     '''
     monitors = [LossMonitor(), MisclassMonitor(), RuntimeMonitor()]
-
+    '''
     model_constraint = MaxNormDefaultConstraint()
 
     loss_function = lambda preds, targets: F.nll_loss(
@@ -164,9 +164,9 @@ if __name__ == '__main__':
                         level=logging.DEBUG, stream=sys.stdout)
     # Should contain both .gdf files and .mat-labelfiles from competition
     data_folder = '/home/al/BCICIV_2a_gdf/'
-    subject_id = 1 # 1-9
+    subject_id = 9 # 1-9
     low_cut_hz = 0 # 0 or 4
-    model = 'deep_dense' #'shallow' or 'deep'
+    model = 'shallow' #'shallow' or 'deep'
     cuda = True
     exp = run_exp(data_folder, subject_id, low_cut_hz, model, cuda)
     log.info("Last 10 epochs")

@@ -139,7 +139,7 @@ if __name__ == '__main__':
                         level=logging.DEBUG, stream=sys.stdout)
     # Should contain both .gdf files and .mat-labelfiles from competition
     data_folder = '/home/al/BCICIV_2a_gdf/'
-    subject_id = 9 # 1-9
+    subject_id = 8 # 1-9
     low_cut_hz = 0 # 0 or 4
     model = 'deep_dense' #'shallow' or 'deep'
     cuda = True
