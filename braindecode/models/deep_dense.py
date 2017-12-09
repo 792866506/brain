@@ -47,7 +47,7 @@ class DeepDenseNet(object):
         del self.self
 
     def create_network(self):
-        conv_length = 7
+        conv_length = 11
         bn_size = self.bn_size
         drop_rate = self.drop_rate
         model = nn.Sequential()
@@ -74,7 +74,7 @@ class DeepDenseNet(object):
                                        stride=(1, 1),
                                        padding=(self.first_filter_length // 2, 0),
                                        bias=False,))
-        model.add_module('bnorm',
+        model.add_module('bn',
                              nn.BatchNorm2d(self.n_first_filters,
                                             momentum=self.batch_norm_alpha,
                                             affine=True,
@@ -84,26 +84,31 @@ class DeepDenseNet(object):
                          nn.MaxPool2d(
                              kernel_size=(self.pool_time_length, 1),stride=(3, 1)))
                              #stride=(self.pool_time_length, 1)))
-                             
+                       
+                        
+                        
+        model.add_module('drop2',nn.Dropout(inplace=True
+                             ))                     
         n_filters_conv = self.n_first_filters
         model.add_module('2_DenseLayer',_DenseLayer(n_filters_conv,50,bn_size, 
                  drop_rate, conv_length = conv_length ))
-        
         model.add_module('pool2',nn.MaxPool2d(
                              kernel_size=(self.pool_time_length, 1),stride=(3, 1)))
-        model.add_module('drop2',nn.Dropout(inplace=True
-                             ))
         
+        
+        
+        model.add_module('drop3',nn.Dropout(inplace=True))
         model.add_module('3_DenseLayer',_DenseLayer(n_filters_conv+50,100,bn_size, 
                  drop_rate, conv_length = conv_length ))
+        model.add_module('pool3', nn.MaxPool2d(kernel_size=(3,1), stride=(3,1)))
         
-        model.add_module('1_Transition',
+        
+        
+        model.add_module('drop4',nn.Dropout(p=0.5,inplace=True))
+        model.add_module('4_Transition',
                          _Transition(175, 100))
         
         
-
-        # Final batch norm
-
         model.eval()
         if self.final_conv_length == 'auto':
             out = model(np_to_var(np.ones(
@@ -128,10 +133,10 @@ class DeepDenseNet(object):
         if self.split_first_layer:
             init.constant(model.conv_time.bias, 0)
             init.xavier_uniform(model.conv_spat.weight, gain=1)
-        '''
-        init.constant(model.norm5.weight, 1)
-        init.constant(model.norm5.bias, 0)
-        '''
+        
+        init.constant(model.bn.weight, 1)
+        init.constant(model.bn.bias, 0)
+        
         init.xavier_uniform(model.conv_classifier.weight, gain=1)
         init.constant(model.conv_classifier.bias, 0)
 
@@ -191,13 +196,11 @@ class _DenseLayer(nn.Sequential):
 class _Transition(nn.Sequential):
     def __init__(self, num_input_features, num_output_features):
         super(_Transition, self).__init__()
-        self.add_module('pool', nn.MaxPool2d(kernel_size=(3,1), stride=(3,1)))
-        self.add_module('drop',nn.Dropout(p=0.5,inplace=True))
         self.add_module('conv', nn.Conv2d(num_input_features, num_output_features,
                                           kernel_size=(11,1), stride=1, bias=False))
         self.add_module('bn', nn.BatchNorm2d(num_output_features, affine=True,))
         self.add_module('elu', nn.ELU(inplace=True))
-        self.add_module('pool2', nn.MaxPool2d(kernel_size=(3,1), stride=(3,1)))
+        self.add_module('pool', nn.MaxPool2d(kernel_size=(3,1), stride=(3,1)))
         init.xavier_uniform(self.conv.weight, gain=1)
         init.constant(self.bn.weight, 1)
         init.constant(self.bn.bias, 0)

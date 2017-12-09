@@ -118,7 +118,7 @@ def run_exp(data_folder, subject_id, low_cut_hz, model, cuda):
     stop_criterion = Or([MaxEpochs(1600),
                          NoDecrease('valid_misclass', 160)])
     '''
-    stop_criterion = Or([MaxEpochs(400),
+    stop_criterion = Or([MaxEpochs(1000),
                          NoDecrease('valid_misclass', 100)])
     monitors = [LossMonitor(), MisclassMonitor(), RuntimeMonitor()]
 
@@ -134,17 +134,39 @@ def run_exp(data_folder, subject_id, low_cut_hz, model, cuda):
     exp.run()
     return exp
 
+'''
 if __name__ == '__main__':
+    
     logging.basicConfig(format='%(asctime)s %(levelname)s : %(message)s',
                         level=logging.DEBUG, stream=sys.stdout)
     # Should contain both .gdf files and .mat-labelfiles from competition
     data_folder = '/home/al/BCICIV_2a_gdf/'
-    subject_id = 8 # 1-9
+    subject_id = 9 # 1-9
     low_cut_hz = 0 # 0 or 4
     model = 'deep_dense' #'shallow' or 'deep'
     cuda = True
     exp = run_exp(data_folder, subject_id, low_cut_hz, model, cuda)
     log.info("Last 10 epochs")
     log.info("\n" + str(exp.epochs_df.iloc[-10:]))
-    print    np.mean(exp.epochs_df.iloc[-10:]['test_misclass'])
-    print    np.min(exp.epochs_df.iloc[-10:]['test_misclass'])
+    np.mean(exp.epochs_df.iloc[-10:]['test_misclass'])
+    np.min(exp.epochs_df.iloc[-10:]['test_misclass'])
+'''
+
+
+if __name__ == '__main__':
+    mean=[]
+    mini=[]
+    for subject_id in xrange(9,10):
+        logging.basicConfig(format='%(asctime)s %(levelname)s : %(message)s',
+                            level=logging.DEBUG, stream=sys.stdout)
+        # Should contain both .gdf files and .mat-labelfiles from competition
+        data_folder = '/home/al/BCICIV_2a_gdf/'
+        #subject_id = 9 # 1-9
+        low_cut_hz = 0 # 0 or 4
+        model = 'deep_dense' #'shallow' or 'deep'
+        cuda = True
+        exp = run_exp(data_folder, subject_id, low_cut_hz, model, cuda)
+        log.info("Last 10 epochs")
+        log.info("\n" + str(exp.epochs_df.iloc[-10:]))
+        mean.append( np.mean(exp.epochs_df.iloc[-10:]['test_misclass']))
+        mini.append( np.min(exp.epochs_df.iloc[-10:]['test_misclass']))
