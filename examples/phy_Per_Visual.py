@@ -183,14 +183,15 @@ train_X_batches = np.concatenate(list(zip(*train_batches))[0])
 
 
 
-from torch import nn
+
 new_model = nn.Sequential()
 for name, module in model.named_children():
-    if name == 'softmax': break
+    if name == 'pool_2': break
     new_model.add_module(name, module)
 
 new_model.eval();
 pred_fn = lambda x: var_to_np(th.mean(new_model(np_to_var(x).cuda())[:,:,:,0], dim=2, keepdim=False))
+#pred_fn = lambda x: var_to_np(new_model(np_to_var(x).cuda()))
 
 from braindecode.visualization.perturbation import compute_amplitude_prediction_correlations
 import logging
@@ -199,7 +200,13 @@ logging.basicConfig(format='%(asctime)s %(levelname)s : %(message)s',
                      level=logging.DEBUG, stream=sys.stdout)
 
 amp_pred_corrs = compute_amplitude_prediction_correlations(pred_fn, train_X_batches, n_iterations=12,
-                                         batch_size=30)
+                                         batch_size=10)
+'''
+abs_amp_pred_corrs = np.abs(amp_pred_corrs)
+
+mean_corr = np.mean(abs_amp_pred_corrs,axis=(0,1,3))
+plt.plot(freqs,mean_corr)
+'''
 
 mean_corr = np.mean(amp_pred_corrs, axis=0)
 

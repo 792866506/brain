@@ -88,19 +88,9 @@ from torch.nn.functional import relu
 cuda = True
 set_random_seeds(seed=20170629, cuda=cuda)
 
-model = DeepDenseNet(in_chans= 64,
-                 n_classes = 2,
-                 input_time_length= input_time_length,
-                 n_first_filters = 25,
-                 final_conv_length='auto',
-                 first_filter_length=3,
-                 nonlinearity=elu,
-                 split_first_layer=True,
-                 batch_norm_alpha=0.1,
-                 bn_size=4, 
-                 drop_rate=0.5, 
-             ).create_network()
-to_dense_prediction_model(model)
+model = DeepDenseNet(in_chans= 64, n_classes = 2,input_time_length= input_time_length,
+                 final_conv_length='auto').create_network()
+#to_dense_prediction_model(model)
 '''
 model = EEGResNet( in_chans = in_chans,
                  n_classes = n_classes,
@@ -147,7 +137,7 @@ iterator = CropsFromTrialsIterator(batch_size=32,input_time_length=input_time_le
 train_accu=[]
 test_accu=[]
 
-for i_epoch in range(30):
+for i_epoch in range(60):
     i_trials_in_batch = get_balanced_batches(len(train_set.X), rng, shuffle=True,
                                            batch_size=32)
     # Set model to training mode

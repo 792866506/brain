@@ -35,6 +35,8 @@ sys.path.insert(0,'/home/al/braindecode/code/braindecode/braindecode')
 from models.eeg_densenet import EEGDenseNet
 from models.eeg_resnet import EEGResNet
 from models.deep_dense import DeepDenseNet
+from models.resnet  import EEGResNet
+
 
 def run_exp(data_folder, subject_id, low_cut_hz, model, cuda):
     train_filename = 'A{:02d}T.gdf'.format(subject_id)
@@ -118,6 +120,9 @@ def run_exp(data_folder, subject_id, low_cut_hz, model, cuda):
                      bn_size=4, 
                      drop_rate=0.5, 
                  ).create_network()
+    elif model== 'resnet':
+        model = EEGResNet(n_chans, n_classes, input_time_length=input_time_length,
+                          final_pool_length=10, n_first_filters=48).create_network()
     if cuda:
         model.cuda()
 
@@ -166,7 +171,7 @@ if __name__ == '__main__':
     data_folder = '/home/al/BCICIV_2a_gdf/'
     subject_id = 9 # 1-9
     low_cut_hz = 0 # 0 or 4
-    model = 'shallow' #'shallow' or 'deep'
+    model = 'resnet' #'shallow' or 'deep' 
     cuda = True
     exp = run_exp(data_folder, subject_id, low_cut_hz, model, cuda)
     log.info("Last 10 epochs")

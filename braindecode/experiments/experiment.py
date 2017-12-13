@@ -192,7 +192,7 @@ class Experiment(object):
         if self.cuda:
             assert th.cuda.is_available(), "Cuda not available"
             self.model.cuda()
-
+    
     def run_until_early_stop(self):
         """
         Run training and evaluation using only training set for training
@@ -399,3 +399,31 @@ class Experiment(object):
             MaxEpochs(max_epochs=self.rememberer.best_epoch * 2),
             ColumnBelow(column_name='valid_loss', target_value=loss_to_reach)])
         log.info("Train loss to reach {:.5f}".format(loss_to_reach))
+        
+    def run_eval(self):
+        """
+        Run training and evaluation on given datasets for one epoch.
+        
+        Parameters
+        ----------
+        datasets: OrderedDict
+            Dictionary with train, valid and test as str mapping to
+            :class:`.SignalAndTarget` objects.
+        remember_best: bool
+            Whether to remember parameters if this epoch is best epoch.
+        """
+        datasets = self.datasets
+        self.epochs_df = pd.DataFrame()
+        set_random_seeds(seed=2382938, cuda=self.cuda)
+        if self.cuda:
+            assert th.cuda.is_available(), "Cuda not available"
+            self.model.cuda()
+        
+        self.monitor_epoch(datasets)
+        self.print_epoch()
+        self.iterator.reset_rng()
+        while not self.stop_criterion.should_stop(self.epochs_df):
+            self.test_one_epoch(datasets)
+    def test_one_epoch(self,datasets):                  
+        self.monitor_epoch(datasets)
+        self.print_epoch()

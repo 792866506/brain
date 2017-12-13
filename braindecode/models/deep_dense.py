@@ -51,6 +51,9 @@ class DeepDenseNet(object):
         bn_size = self.bn_size
         drop_rate = self.drop_rate
         model = nn.Sequential()
+        model.add_module('fc',nn.Conv2d(22,30,(1,1),1,bias=False))
+        model.add_module('bn_fc',nn.BatchNorm2d(30))
+        #model.add_module('elu_fc',nn.ELU(inplace=True))
         if self.split_first_layer:
             model.add_module('dimshuffle', Expression(_transpose_time_to_spat))
             model.add_module('conv_time', nn.Conv2d(1, self.n_first_filters,
@@ -60,13 +63,11 @@ class DeepDenseNet(object):
                                                     ))
             model.add_module('conv_spat',
                              nn.Conv2d(self.n_first_filters, self.n_first_filters,
-                                       (1, self.in_chans),
+                                       (1, 30),
                                        stride=(1, 1),
                                        bias=False))
-            out = model(np_to_var(np.ones(
-                (1, self.in_chans, self.input_time_length,1),
-                dtype=np.float32)))
-            print out.size()
+            
+            
         else:
             model.add_module('conv_time',
                              nn.Conv2d(self.in_chans, self.n_first_filters,
