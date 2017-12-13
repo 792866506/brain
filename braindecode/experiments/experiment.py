@@ -2,7 +2,7 @@ import logging
 from collections import OrderedDict
 from copy import deepcopy
 import time
-
+import numpy as np
 import pandas as pd
 import torch as th
 
@@ -370,6 +370,57 @@ class Experiment(object):
         self.epochs_df = self.epochs_df.append(row_dict, ignore_index=True)
         assert set(self.epochs_df.columns) == set(row_dict.keys())
         self.epochs_df = self.epochs_df[list(row_dict.keys())]
+        
+    def monitor_eval_epoch(self, datasets):
+        """
+        Evaluate one epoch for given datasets.
+        
+        Stores results in `epochs_df`
+        
+        Parameters
+        ----------
+        datasets: OrderedDict
+            Dictionary with train, valid and test as str mapping to
+            :class:`.SignalAndTarget` objects.
+
+        """
+        result_dicts_per_monitor = OrderedDict()
+        for m in self.monitors:
+            result_dicts_per_monitor[m] = OrderedDict()
+        for m in self.monitors:
+            result_dict = m.monitor_epoch()
+            if result_dict is not None:
+                result_dicts_per_monitor[m].update(result_dict)
+        for setname in datasets:
+            assert setname in ['train', 'valid', 'test']
+            dataset = datasets[setname]
+            all_preds = []
+            all_losses = []
+            all_batch_sizes = []
+            all_targets = []
+            for batch in self.iterator.get_batches(dataset, shuffle=False):
+                preds, loss = self.eval_on_batch(batch[0], batch[1])
+                all_preds.append(preds)
+                all_losses.append(loss)
+                all_batch_sizes.append(len(batch[0]))
+                all_targets.append(batch[1])
+
+            for m in self.monitors:
+                result_dict = m.monitor_set(setname, all_preds, all_losses,
+                                            all_batch_sizes, all_targets,
+                                            dataset)
+                if result_dict is not None:
+                    result_dicts_per_monitor[m].update(result_dict)
+            if setname=='test':
+                self.all_preds = np.argmax(np.concatenate(all_preds),axis=1)                
+                self.all_targets = np.concatenate(all_targets)
+        row_dict = OrderedDict()
+        for m in self.monitors:
+            row_dict.update(result_dicts_per_monitor[m])
+        self.epochs_df = self.epochs_df.append(row_dict, ignore_index=True)
+        assert set(self.epochs_df.columns) == set(row_dict.keys())
+        self.epochs_df = self.epochs_df[list(row_dict.keys())]
+        
 
     def print_epoch(self):
         """
@@ -419,11 +470,5 @@ class Experiment(object):
             assert th.cuda.is_available(), "Cuda not available"
             self.model.cuda()
         
-        self.monitor_epoch(datasets)
-        self.print_epoch()
-        self.iterator.reset_rng()
-        while not self.stop_criterion.should_stop(self.epochs_df):
-            self.test_one_epoch(datasets)
-    def test_one_epoch(self,datasets):                  
-        self.monitor_epoch(datasets)
-        self.print_epoch()
+        self.monitor_eval_epoch(datasets)
+        self.print_epoch()        

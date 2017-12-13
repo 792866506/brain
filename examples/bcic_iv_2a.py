@@ -169,7 +169,8 @@ def run_exp(data_folder, subject_id, low_cut_hz, model_name, cuda,pca=False):
         exp.run_eval()
     return exp
 
-def test_exp(data_folder, subject_id, low_cut_hz, model_name, cuda,pca=False):
+def test_exp(data_folder, subject_id, low_cut_hz, model_name, cuda,
+             class_label=None,pca=False):
     train_filename = 'A{:02d}T.gdf'.format(subject_id)
     test_filename = 'A{:02d}E.gdf'.format(subject_id)
     train_filepath = os.path.join(data_folder, train_filename)
@@ -236,14 +237,13 @@ def test_exp(data_folder, subject_id, low_cut_hz, model_name, cuda,pca=False):
     train_set = create_signal_target_from_raw_mne(train_cnt, marker_def, ival)
     test_set = create_signal_target_from_raw_mne(test_cnt, marker_def, ival)
     
-    
-    aa=3
-    index = np.where(train_set.y==aa)
-    train_set.X = train_set.X[index]
-    train_set.y = train_set.y[index]
-    index = np.where(test_set.y==aa)
-    test_set.X = test_set.X[index]
-    test_set.y = test_set.y[index]
+    if class_label!=None:
+        index = np.where(train_set.y==class_label)
+        train_set.X = train_set.X[index]
+        train_set.y = train_set.y[index]
+        index = np.where(test_set.y==class_label)
+        test_set.X = test_set.X[index]
+        test_set.y = test_set.y[index]
     
            
     train_set, valid_set = split_into_two_sets(train_set,
@@ -304,7 +304,8 @@ if __name__ == '__main__':
     mean=[]
     mini=[]
     train = False
-    for subject_id in xrange(2,3):
+    confuse_mat =[]
+    for subject_id in xrange(1,10):
         logging.basicConfig(format='%(asctime)s %(levelname)s : %(message)s',
                             level=logging.DEBUG, stream=sys.stdout)
         # Should contain both .gdf files and .mat-labelfiles from competition
@@ -334,14 +335,40 @@ if __name__ == '__main__':
             writer.close()
             mean.append( np.mean(exp.epochs_df.iloc[-10:]['test_misclass']))
             mini.append( np.min(exp.epochs_df.iloc[-10:]['test_misclass']))
-            torch.save(exp.model,'/home/al/braindecode/bci_{:01d}_model.pkl'.format(subject_id))
+            #torch.save(exp.model,'/home/al/braindecode/bci_{:01d}_model.pkl'.format(subject_id))
             
         else :
             model_name = '/home/al/braindecode/bci_{:01d}_model.pkl'.format(subject_id)
             exp = test_exp(data_folder, subject_id, low_cut_hz, model_name, cuda)
-            log.info("Last 10 epochs")
-            log.info("\n" + str(exp.epochs_df.iloc[-10:]))
-            print 1-exp.epochs_df.iloc[-10:]
+            log.info("\n" + str(exp.epochs_df))
+            print 1-exp.epochs_df
+            
+            labels =exp.all_targets
+            preds  = exp.all_preds           
+            
+            left_index =  np.where(labels == 0)[0]
+            right_index = np.where(labels == 1)[0]
+            foot_index =  np.where(labels == 2)[0]
+            tongue_index = np.where(labels == 3)[0]
+            
+            index_dict=[('left_index',left_index),
+                                     ('right_index',right_index),
+                                     ('foot_index',foot_index),
+                                     ('tongue_index',tongue_index)]
+            
+            result_list=[]
+            for name,index in index_dict:
+                a=np.sum(preds[index]==0)
+                b=np.sum(preds[index]==1)
+                c=np.sum(preds[index]==2)
+                d=np.sum(preds[index]==3)
+                result_list.append(np.array([a,b,c,d]))
+            result_array = np.array(result_list)
+            confuse_mat.append(result_array)
+    new_confuse_mat = np.array(confuse_mat)
+            
+            
+
 
 
 '''
