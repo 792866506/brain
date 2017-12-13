@@ -1,0 +1,21 @@
+RCNN_EEG (
+  (conv_time): Sequential (
+    (conv): Conv2d(22, 40, kernel_size=(25, 1), stride=(1, 1))
+    (bn): BatchNorm2d(40, eps=1e-05, momentum=0.1, affine=True)
+    (relu): ReLU (inplace)
+    (dimshuffle): Expression(expression=_transpose)
+    (squeeze): Expression(expression=_squeeze_final_output)
+  )
+  (lstm): LSTM(40, 64, num_layers=2, batch_first=True, dropout=0.5, bidirectional=True)
+  (fc): Sequential (
+    (linear1): Linear (128 -> 100)
+    (bn1): BatchNorm1d(100, eps=1e-05, momentum=0.1, affine=True)
+    (relu1): ReLU (inplace)
+    (drop2): Dropout (p = 0.5)
+    (linear2): Linear (100 -> 10)
+    (bn2): BatchNorm1d(10, eps=1e-05, momentum=0.1, affine=True)
+    (relu2): ReLU (inplace)
+    (classifier): Linear (10 -> 4)
+    (softmax): Softmax ()
+  )
+)
