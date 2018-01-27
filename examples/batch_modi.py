@@ -1,3 +1,11 @@
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+"""
+Created on Fri Jan 26 22:56:25 2018
+
+@author: al
+"""
+
 import logging
 import os.path
 
@@ -48,8 +56,7 @@ def for_hook(module, inpt, output):
 def batch_modifier(inputs,targets):
     index= np.arange(22)
     for x in inputs:
-        print x
-        if np.random.randn>0.75:
+        if np.random.rand((1))>0.8:
             np.random.shuffle(index)
             x[index[:2]]=0
     return inputs,targets
@@ -112,26 +119,7 @@ def run_exp(data_num,data_folder, subject_id, low_cut_hz, model_name, cuda,pca=F
            
     train_set, valid_set = split_into_two_sets(train_set,
                                                first_set_fraction=0.8)
-    
-    #  data augument
-    mix_num = data_num
-    new_data=[]
-    new_label=[]
-    for mix_label in [0,1,2,3]:
-        index=np.where(train_set.y==mix_label)[0]
-        for ite in xrange(mix_num):
-            #np.random.shuffle(index)
-            for i in xrange(25):
-                new_data.append(
-                        np.sum([train_set.X[i],train_set.X[i+25]],axis=0)/2.0
-                        )
-        new_label.extend([mix_label]*25*mix_num)
-        
-        
-    new_label = np.array(new_label)
-    new_train_set=SignalAndTarget(np.concatenate([train_set.X,np.array(new_data)],axis=0),
-                    np.concatenate([train_set.y,new_label],axis=0))
-    
+
     set_random_seeds(seed=20190706, cuda=cuda)
     n_classes = 4
     n_chans = int(train_set.X.shape[1])
@@ -168,56 +156,35 @@ def run_exp(data_num,data_folder, subject_id, low_cut_hz, model_name, cuda,pca=F
 
     iterator = BalancedBatchSizeIterator(batch_size=60)
 
-    stop_criterion = Or([MaxEpochs(500),
-                         NoDecrease('valid_misclass', 100)])
+    stop_criterion = Or([MaxEpochs(200),
+                         NoDecrease('valid_misclass', 60)])
     monitors = [LossMonitor(),MisclassMonitor()]
     model_constraint = MaxNormDefaultConstraint()
-    
-    exp = Experiment(model, new_train_set, valid_set, test_set,
-                     iterator=iterator,
-                     loss_function=F.nll_loss, optimizer=optimizer,
-                     model_constraint=model_constraint,
-                     monitors=monitors,
-                     stop_criterion=stop_criterion,
-                     remember_best_column='valid_misclass',
-                     run_after_early_stop=False, cuda=cuda)
-    exp.new_run()
-    print '22222222222222222222222222222'
-    model = exp.model
-    if cuda:
-        model.cuda()            
-    stop_criterion = Or([MaxEpochs(100),
-                         NoDecrease('valid_misclass', 100)])
 
     exp = Experiment(model, train_set, valid_set, test_set,
                      iterator=iterator,
                      loss_function=F.nll_loss, optimizer=optimizer,
                      model_constraint=model_constraint,
                      monitors=monitors,
+                     batch_modifier=batch_modifier,
                      stop_criterion=stop_criterion,
                      remember_best_column='valid_misclass',
                      run_after_early_stop=False, cuda=cuda)
-    exp.new_run()# not  remember  model  
+    exp.run()
     
-    
-    model = exp.model
-    if cuda:
-        model.cuda()      
-    monitors = [LossMonitor(),MisclassMonitor()]
-    
-    stop_criterion = Or([MaxEpochs(600),
-                         NoDecrease('test_misclass', 100)])
-    
+    model = exp.model.cuda()
+    stop_criterion = Or([MaxEpochs(500),
+                         NoDecrease('valid_misclass', 100)])
     exp = Experiment(model, train_set, valid_set, test_set,
                      iterator=iterator,
                      loss_function=F.nll_loss, optimizer=optimizer,
                      model_constraint=model_constraint,
                      monitors=monitors,
+                     batch_modifier=None,
                      stop_criterion=stop_criterion,
-                     remember_best_column='test_misclass',
+                     remember_best_column='valid_misclass',
                      run_after_early_stop=True, cuda=cuda)
     exp.run()
-    
     return exp
 
 def test_exp(data_folder, subject_id, low_cut_hz, model_name, cuda,
@@ -348,10 +315,10 @@ if __name__ == '__main__':
             log.info("\n" + str(1-exp.epochs_df['test_misclass'].iloc[-10:]))
             mean.append( np.mean(exp.epochs_df.iloc[-10:]['test_misclass']))
             mini.append( np.min(exp.epochs_df.iloc[-10:]['test_misclass']))
-            file_name='/home/al/braindecode/data_aug/num{:02d}_bci_{:01d}_model.pkl'.format(data_num,subject_id)        
+            file_name='/home/al/braindecode/drop_ch/num{:02d}_bci_{:01d}_model.pkl'.format(data_num,subject_id)        
             #torch.save(exp.model,file_name)
         else :
-            model_name = '/home/al/braindecode/data_aug/num{:02d}_bci_{:01d}_model.pkl'.format(data_num,subject_id)
+            model_name = '/home/al/braindecode/drop_ch/num{:02d}_bci_{:01d}_model.pkl'.format(data_num,subject_id)
             #deep_dense_model   shallow_model  se_dense  se_32_16  dense_enter_se
             exp = test_exp(data_folder, subject_id, low_cut_hz, model_name, cuda)
             log.info("\n" + str(exp.epochs_df))
@@ -388,56 +355,3 @@ np.mean(mean)
 
 '''
 
-'''
-mean=[0.26701388888888883, 0.46736111111111106]+ \
-[0.14270833333333335, 0.29236111111111118]+\
-[0.26250000000000007, 0.41076388888888882]+\
-[0.12222222222222223, 0.16388888888888892]+[0.17465277777777777]
-print 1-np.mean(mean)
-0.744058641975
-
-mini=[0.21875, 0.45138888888888884]+\
- [0.11111111111111116, 0.26736111111111116]+\
- [0.24305555555555558, 0.38194444444444442]+\
- [0.11111111111111116, 0.14930555555555558]+[0.16319444444444442]
-print 1-np.mean(mini)
-
-
-[0.19375000000000001,
- 0.48263888888888895,
- 0.11215277777777777,
- 0.24513888888888893,
- 0.27361111111111108,
- 0.4145833333333333,
- 0.14583333333333331,
- 0.15069444444444444,
- 0.16840277777777776]  0.75702160493827164
-
-
-[0.17013888888888884,
- 0.44791666666666663,
- 0.09375,
- 0.23263888888888884,
- 0.26041666666666663,
- 0.37847222222222221,
- 0.12152777777777779,
- 0.13888888888888884,
- 0.14930555555555558]   0.77
-
-
-
-0.13368055555555552, 0.23854166666666665]
-[0.11006944444444441, 0.24131944444444442]
-
-
-data=[]
-def for_hook(module, input, output):
-    for out_val in output:
-        print("output val:", out_val)
-        data.append(out_val.cpu().data.numpy())
-    
-handle = model.selayer.fc.sigmoid.register_forward_hook(for_hook)
-model(np_to_var(train_set.X[:100,:,:,np.newaxis]).cuda())
-mean=np.mean(data,axis=0)
-
-'''

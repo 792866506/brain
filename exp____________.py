@@ -1,3 +1,11 @@
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+"""
+Created on Sat Jan 27 10:22:42 2018
+
+@author: al
+"""
+
 import logging
 from collections import OrderedDict
 from copy import deepcopy
@@ -191,7 +199,21 @@ class Experiment(object):
         log.info("Run until first stop...")
         self.run_until_early_stop()
 
-
+     def run_data_agu(self):
+        """
+        Run complete training.
+        """
+        self.setup_training()
+        log.info("Run until first stop...")
+        self.run_until_early_stop()
+        # always setup for second stop, in order to get best model
+        # even if not running after early stop...
+        print 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+        if self.run_after_early_stop:
+            log.info("Setup for second stop...")
+            self.setup_after_stop_training()
+            log.info("Run until second stop...")
+            self.run_until_second_stop()
 
     def setup_training(self):
         """
@@ -231,7 +253,7 @@ class Experiment(object):
         # reset to best model again (check if valid loss not below train loss)
         self.run_second_until_stop(datasets, remember_best=False)
 
-    def run_until_stop(self, datasets, remember_best):
+    def run_until_stop(self, datasets, remember_best,batch_modifier):
         """
         Run training and evaluation on given datasets until stop criterion is
         fulfilled.
@@ -252,7 +274,7 @@ class Experiment(object):
 
         self.iterator.reset_rng()
         while not self.stop_criterion.should_stop(self.epochs_df):
-            self.run_one_epoch(datasets, remember_best)
+            self.run_one_epoch(datasets, remember_best,batch_modifier)
     
     def run_second_until_stop(self, datasets, remember_best):
         """
@@ -276,7 +298,7 @@ class Experiment(object):
         self.iterator.reset_rng()
         while not self.stop_criterion.should_stop(self.epochs_df):
             self.run_second_epoch(datasets, remember_best)
-    def run_one_epoch(self, datasets, remember_best):
+    def run_one_epoch(self, datasets, remember_best,batch_modifier):
         """
         Run training and evaluation on given datasets for one epoch.
         
@@ -292,7 +314,7 @@ class Experiment(object):
                                                     shuffle=True)
         start_train_epoch_time = time.time()
         for inputs, targets in batch_generator:
-            if self.batch_modifier is not None:
+            if batch_modifier is not None:
                 inputs, targets = self.batch_modifier(inputs, targets)
             # could happen that batch modifier has removed all inputs...
             if len(inputs) > 0:

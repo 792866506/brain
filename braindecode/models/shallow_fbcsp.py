@@ -5,7 +5,9 @@ from torch.nn import init
 from braindecode.torch_ext.modules import Expression
 from braindecode.torch_ext.functions import safe_log, square
 from braindecode.torch_ext.util import np_to_var
-
+import sys
+sys.path.insert(0,'/home/al/braindecode/code/braindecode/braindecode')
+from models.SENet import SELayer
 
 class ShallowFBCSPNet(object):
     """
@@ -44,6 +46,8 @@ class ShallowFBCSPNet(object):
     def create_network(self):
         pool_class = dict(max=nn.MaxPool2d, mean=nn.AvgPool2d)[self.pool_mode]
         model = nn.Sequential()
+        #model.add_module('fc1',nn.Conv2d(22,30,(1,1),1))
+        #model.add_module('fc_bn',nn.BatchNorm2d(30))
         if self.split_first_layer:
             model.add_module('dimshuffle', Expression(_transpose_time_to_spat))
             model.add_module('conv_time', nn.Conv2d(1, self.n_filters_time,
@@ -52,9 +56,12 @@ class ShallowFBCSPNet(object):
                                                     stride=1, ))
             model.add_module('conv_spat',
                              nn.Conv2d(self.n_filters_time, self.n_filters_spat,
-                                       (1, self.in_chans), stride=1,
+                                       (1, 22), stride=1,
                                        bias=not self.batch_norm))
             n_filters_conv = self.n_filters_spat
+            
+            
+            
         else:
             model.add_module('conv_time',
                              nn.Conv2d(self.in_chans, self.n_filters_time,
@@ -68,6 +75,7 @@ class ShallowFBCSPNet(object):
                                             momentum=self.batch_norm_alpha,
                                             affine=True),)
         model.add_module('conv_nonlin', Expression(self.conv_nonlin))
+        
         model.add_module('pool',
                          pool_class(kernel_size=(self.pool_time_length, 1),
                                     stride=(self.pool_time_stride, 1)))
