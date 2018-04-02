@@ -129,7 +129,6 @@ if __name__ =='__main__':
         
 #        if save:
 #            path = 'p300_sub1'
-#            model_name = '/home/al/braindecode/result/'+path+'/sub{:1d}'\
-#                       .format(subject_id)
+#            model_name = '/home/al/braindecode/result/'+path+'/sub{:1d}'.format(subject_id)
 #            torch.save(exp.model,model_name)
         
