@@ -225,8 +225,8 @@ class CNN_LSTM(nn.Module):
             branch_out.append(out)
         lstm_in = torch.cat((branch_out), 1)
         #print lstm_in.size()
-        lstm_out = self.lstm(lstm_in)
-        lstm_out = lstm_out[0]
+        lstm_out = self.lstm(lstm_in)[0]
+        #lstm_out = lstm_out[0]
         lstm_out = lstm_out[:, -1, :]
         # print lstm_out.size()
         conv_in = lstm_in.permute(0, 2, 1).unsqueeze(3)  # 10, 2048, 7, 1

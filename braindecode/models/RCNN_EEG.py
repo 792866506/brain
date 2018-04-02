@@ -37,14 +37,18 @@ def _squeeze_final_output(x):
 
 def _transpose(x):
     return x.permute(0, 2, 1, 3)  
-      
+
+def _transpose_time_to_spat(x):
+    return x.permute(0, 3, 2, 1) 
 
 class RCNN_EEG(nn.Module): 
     def __init__(self,  in_chans,
                  n_classes,
                  input_time_length=None,
+                 map_chans = 30,
+                 n_first_filters = 25,
                  n_filters_time=30,
-                 filter_time_length=11,
+                 first_filter_length=11,
                  n_filters_spat=40,
                  pool_time_length=75,
                  pool_time_stride=15,
@@ -60,20 +64,21 @@ class RCNN_EEG(nn.Module):
         self.model_name = 'RCNN_EEG'
         kernel_size = 3
         
-        model = DeepDenseNet(in_chans= self.in_chans,
-                     n_classes = self.n_classes,
-                     input_time_length= self.input_time_length,
-                     final_conv_length='auto',                               
-                     bn_size=2,  ).create_network()
-        self.conv_time=nn.Sequential( )        
+        self.conv_time=nn.Sequential( )
+        
         self.conv_time.add_module('conv', 
-                                  nn.Conv2d(self.in_chans, self.n_filters_time,
-                                        ( self.filter_time_length, 1),
-                                        stride=1, ))
-        self.conv_time.add_module('pool',nn.MaxPool2d(kernel_size=(3,1),
-                                        stride=(3,1)))
+                                  nn.Conv2d(self.in_chans, self.map_chans,
+                                        (1,1),
+                                        stride=1,))
+        self.conv_time.add_module('conv_time', 
+                                  nn.Conv2d(self.map_chans, self.map_chans,
+                                        (self.first_filter_length, 1),
+                                        stride=1,))
         self.conv_time.add_module('bn',nn.BatchNorm2d(self.n_filters_time))
         self.conv_time.add_module('relu',nn.ReLU(inplace=True),) 
+        #self.conv_time.add_module('pool',nn.MaxPool2d(kernel_size=(3,1),
+                             #          stride=(3,1)))
+        
         self.conv_time.add_module('dimshuffle',Expression(_transpose))
         self.conv_time.add_module('squeeze',Expression(_squeeze_final_output))
         
@@ -82,28 +87,30 @@ class RCNN_EEG(nn.Module):
                 dtype=np.float32)))
         input_size =  out.size()[2]
         dummy_input = out
-        print dummy_input.size()                    
+        #print dummy_input.size()                    
         self.lstm = nn.LSTM(input_size = input_size,
-                            hidden_size = 48,
+                            hidden_size = 64,
                             num_layers = 2,
                             bias = True,
                             batch_first = True,
                             dropout = 0.5,
-                            bidirectional = True
+                            bidirectional = False
                             )
         lstm_out = self.lstm(dummy_input)
+        #print lstm_out[0].size()
         lstm_out = lstm_out[0]
-        lstm_out = lstm_out[:, -1, :]
-        print lstm_out.size()
+        lstm_out = lstm_out[:,-1,:]#torch.mean(lstm_out,1,keepdim=False)
+        #print lstm_out.size()
         fc_input_size = lstm_out.view(-1).size()[0]
         self.fc = nn.Sequential( OrderedDict([
                 ('drop1',nn.Dropout(0.5)),
-                ('linear1',nn.Linear(fc_input_size,50)),
-                ('bn1',nn.BatchNorm1d(50)),
+                ('linear1',nn.Linear(fc_input_size,64)),
+                ('bn1',nn.BatchNorm1d(64)),
                 ('relu1',nn.ReLU(inplace=True)),
-                ('classifier',nn.Linear(50,self.n_classes)),
-                ('softmax',nn.Softmax()),
+                ('classifier',nn.Linear(64,self.n_classes)),
+                ('softmax',nn.LogSoftmax()),
                 ]))              
+        
         init.xavier_uniform(self.conv_time.conv.weight, gain=1)    
         init.constant(self.conv_time.conv.bias, 0)
         
@@ -113,7 +120,7 @@ class RCNN_EEG(nn.Module):
         
         init.constant(self.fc.linear1.bias, 0)
         #init.constant(self.fc.linear2.bias, 0)
-                
+        
     def forward(self, X): 
         out=self.conv_time(X)  
         #print out.size()
@@ -127,7 +134,7 @@ class RCNN_EEG(nn.Module):
 
  
 if __name__ == '__main__':
-    m = RCNN_EEG(22,4,1125)
+    m = RCNN_EEG(in_chans=22,n_classes=4,input_time_length=1125)
     X=np_to_var(np.random.randn(10,22,1125,1).astype('float32'))
     o = m(X)
     print(o.size())

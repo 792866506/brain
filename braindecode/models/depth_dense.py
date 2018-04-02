@@ -1,11 +1,10 @@
 #!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 """
-Created on Fri Dec  8 16:48:39 2017
+Created on Mon Feb  5 17:14:15 2018
 
-@author:    al
+@author: al
 """
-
 
 import numpy as np
 import torch
@@ -24,7 +23,7 @@ import sys
 sys.path.insert(0,'/home/al/braindecode/code/braindecode/braindecode')
 from models.SENet import SELayer
 
-class DeepDenseNet(object):
+class DepthDenseNet(object):
     """
     Dense Network for EEG.
     """
@@ -56,17 +55,25 @@ class DeepDenseNet(object):
         model = nn.Sequential()
         model.add_module('fc',nn.Conv2d(self.in_chans,self.map_chans,(1,1),1,bias=False))
         #model.add_module('selayer',SELayer(channel=30,reduction=15))
-        model.add_module('bn_fc',nn.BatchNorm2d(self.map_chans))
+        #model.add_module('bn_fc',nn.BatchNorm2d(self.map_chans))
         #model.add_module('fc_elu',nn.ELU(inplace=True))
         if self.split_first_layer:
-            model.add_module('dimshuffle', Expression(_transpose_time_to_spat))
-            model.add_module('conv_time', nn.Conv2d(1, self.n_first_filters,
-                                                    (
-                                                    self.first_filter_length, 1),
+            model.add_module('conv_time',nn.Conv2d(self.map_chans,self.map_chans,
+                                                    (11,1),
                                                     stride=1,
-                                                    ))
+                                                    groups=self.map_chans,
+                                                    bias=False) )
+            
+            model.add_module('bn_',
+                                 nn.BatchNorm2d(self.map_chans,
+                                                momentum=self.batch_norm_alpha,
+                                                affine=True,
+                                                eps=1e-5),)
+            model.add_module('elu_', nn.ELU(inplace=True))
+            
+            model.add_module('dimshuffle', Expression(_transpose_time_to_spat))
             model.add_module('conv_spat',
-                             nn.Conv2d(self.n_first_filters, self.n_first_filters,
+                             nn.Conv2d(1, self.n_first_filters,
                                        (1, self.map_chans),
                                        stride=(1, 1),
                                        bias=False))
@@ -125,19 +132,18 @@ class DeepDenseNet(object):
             self.final_conv_length = n_out_time
         else :
             n_cur_filters = 100
-            self.final_conv_length = 8
             
         model.add_module('conv_classifier',
                              nn.Conv2d(n_cur_filters, self.n_classes,
                                        (self.final_conv_length, 1), bias=True))
-        model.add_module('softmax', nn.LogSoftmax(dim=1))
+        model.add_module('softmax', nn.LogSoftmax())
         model.add_module('squeeze',  Expression(_squeeze_final_output))
 
         # Initialization, xavier is same as in our paper...
         # was default from lasagne
         init.xavier_uniform(model.conv_time.weight, gain=1)
         if self.split_first_layer:
-            init.constant(model.conv_time.bias, 0)
+            #init.constant(model.conv_time.bias, 0)
             init.xavier_uniform(model.conv_spat.weight, gain=1)
         
         init.constant(model.bn.weight, 1)
@@ -222,4 +228,4 @@ class _DenseBlock(nn.Sequential):
             self.add_module('denselayer%d' % (i + 1), layer)
             
 
-#aa=DeepDenseNet(22,4,1125).create_network()
+#aa=DepthDenseNet(22,4,1000).create_network()

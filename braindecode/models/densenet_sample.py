@@ -1,6 +1,14 @@
 #!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 """
+Created on Mon Mar  5 11:37:08 2018
+
+@author: al
+"""
+
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+"""
 Created on Fri Dec  8 16:48:39 2017
 
 @author:    al
@@ -24,7 +32,7 @@ import sys
 sys.path.insert(0,'/home/al/braindecode/code/braindecode/braindecode')
 from models.SENet import SELayer
 
-class DeepDenseNet(object):
+class DeepDenseNet(nn.Module):
     """
     Dense Network for EEG.
     """
@@ -43,11 +51,24 @@ class DeepDenseNet(object):
                  bn_size=2, 
                  drop_rate=0.5, 
                  ):
+        super(DeepDenseNet, self).__init__()
         if final_conv_length == 'auto':
             assert input_time_length is not None
         assert first_filter_length % 2 == 1
         self.__dict__.update(locals())
         del self.self
+
+        
+
+    def forward(self, x):
+        features = self.features(x)
+        #print features.size()
+        out = F.relu(features, inplace=True)
+        #out = F.avg_pool2d(out, kernel_size=7).view(features.size(0), -1)
+        out = F.max_pool2d(out, kernel_size=(78,25)).view(features.size(0), -1)
+        #print out.size()
+        out = self.classifier(out)
+        return out
 
     def create_network(self):
         conv_length = 11
@@ -55,9 +76,7 @@ class DeepDenseNet(object):
         drop_rate = self.drop_rate
         model = nn.Sequential()
         model.add_module('fc',nn.Conv2d(self.in_chans,self.map_chans,(1,1),1,bias=False))
-        #model.add_module('selayer',SELayer(channel=30,reduction=15))
         model.add_module('bn_fc',nn.BatchNorm2d(self.map_chans))
-        #model.add_module('fc_elu',nn.ELU(inplace=True))
         if self.split_first_layer:
             model.add_module('dimshuffle', Expression(_transpose_time_to_spat))
             model.add_module('conv_time', nn.Conv2d(1, self.n_first_filters,
@@ -125,12 +144,11 @@ class DeepDenseNet(object):
             self.final_conv_length = n_out_time
         else :
             n_cur_filters = 100
-            self.final_conv_length = 8
             
         model.add_module('conv_classifier',
                              nn.Conv2d(n_cur_filters, self.n_classes,
                                        (self.final_conv_length, 1), bias=True))
-        model.add_module('softmax', nn.LogSoftmax(dim=1))
+        model.add_module('softmax', nn.LogSoftmax())
         model.add_module('squeeze',  Expression(_squeeze_final_output))
 
         # Initialization, xavier is same as in our paper...
@@ -222,4 +240,4 @@ class _DenseBlock(nn.Sequential):
             self.add_module('denselayer%d' % (i + 1), layer)
             
 
-#aa=DeepDenseNet(22,4,1125).create_network()
+#aa=DeepDenseNet(22,4,1000).create_network()

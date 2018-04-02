@@ -65,8 +65,7 @@ class Deep4Net(object):
         later_pool_class = pool_class_dict[self.later_pool_mode]
         model = nn.Sequential()
         if self.split_first_layer:
-            model.add_module('dimshuffle',
-                             Expression(lambda x: x.permute(0, 3, 2, 1)))
+            model.add_module('dimshuffle', Expression(_transpose_time_to_spat))
             model.add_module('conv_time', nn.Conv2d(1, self.n_filters_time,
                                                     (
                                                     self.filter_time_length, 1),
@@ -140,16 +139,8 @@ class Deep4Net(object):
         model.add_module('conv_classifier',
                              nn.Conv2d(self.n_filters_4, self.n_classes,
                                        (self.final_conv_length, 1), bias=True))
-        model.add_module('softmax', nn.LogSoftmax())
-        # remove empty dim at end and potentially remove empty time dim
-        # do not just use squeeze as we never want to remove first dim
-        def squeeze_output(x):
-            assert x.size()[3] == 1
-            x = x[:,:,:,0]
-            if x.size()[2] == 1:
-                x = x[:,:,0]
-            return x
-        model.add_module('squeeze',  Expression(squeeze_output))
+        model.add_module('squeeze',  Expression(_squeeze_final_output))
+        model.add_module('softmax', nn.LogSoftmax(dim=-1))
 
         # Initialization, xavier is same as in our paper...
         # was default from lasagne
@@ -178,3 +169,13 @@ class Deep4Net(object):
         init.constant(model.conv_classifier.bias, 0)
 
         return model
+def _squeeze_final_output(x):
+    assert x.size()[3] == 1
+    x = x[:,:,:,0]
+    if x.size()[2] == 1:
+        x = x[:,:,0]
+    return x
+
+
+def _transpose_time_to_spat(x):
+    return x.permute(0, 3, 2, 1)

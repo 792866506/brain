@@ -16,7 +16,7 @@ class EEGResNet(object):
     def __init__(self, in_chans,
                  n_classes,
                  input_time_length,
-                 final_pool_length,
+                 final_pool_length='auto' ,
                  n_first_filters = 48,
                  n_layers_per_block=2,
                  first_filter_length=3,
@@ -136,15 +136,16 @@ class EEGResNet(object):
                 dtype=np.float32)))
             n_out_time = out.cpu().data.numpy().shape[2]
             self.final_pool_length = n_out_time
+            print n_out_time,1
+            print 111111111
         model.add_module('mean_pool', AvgPool2dWithConv(
             (self.final_pool_length, 1), (1,1), dilation=(int(cur_dilation[0]),
                                                           int(cur_dilation[1]))))
         model.add_module('conv_classifier',
                              nn.Conv2d(n_cur_filters, self.n_classes,
                                        (1, 1), bias=True))
-        model.add_module('softmax', nn.LogSoftmax())
         model.add_module('squeeze',  Expression(_squeeze_final_output))
-
+        model.add_module('softmax', nn.LogSoftmax(dim=2))
         # Initialization, xavier is same as in our paper...
         # was default from lasagne
         init.kaiming_normal(model.conv_time.weight, a=0)
@@ -248,6 +249,6 @@ class ResidualBlock(nn.Module):
         return out
 if __name__ == '__main__':
     aa = torch.autograd.Variable(torch.ones(10, 22, 1125, 1), requires_grad=True)
-    model=EEGResNet(22,4,1125,11,46).create_network()
+    model=EEGResNet(22,4,1125,).create_network()
     out= model(aa)
     print  out.size()

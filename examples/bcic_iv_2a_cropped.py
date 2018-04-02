@@ -96,7 +96,7 @@ def run_exp(data_folder, subject_id, low_cut_hz, model, cuda):
 
     set_random_seeds(seed=20190706, cuda=cuda)
 
-    n_classes = 4
+    n_classes = len(marker_def)
     n_chans = int(train_set.X.shape[1])
     input_time_length=1000
     if model == 'shallow':
@@ -112,7 +112,7 @@ def run_exp(data_folder, subject_id, low_cut_hz, model, cuda):
                      n_classes = n_classes,
                      input_time_length= input_time_length,
                      n_first_filters = 25,
-                     final_conv_length=2,
+                     final_conv_length='auto',
                      first_filter_length=3,
                      nonlinearity=elu,
                      split_first_layer=True,
@@ -136,12 +136,12 @@ def run_exp(data_folder, subject_id, low_cut_hz, model, cuda):
 
     optimizer = optim.Adam(model.parameters())
 
-    iterator = CropsFromTrialsIterator(batch_size=60,
+    iterator = CropsFromTrialsIterator(batch_size=32,
                                        input_time_length=input_time_length,
                                        n_preds_per_input=n_preds_per_input)
 
-    stop_criterion = Or([MaxEpochs(400),
-                         NoDecrease('valid_misclass', 100)])
+    stop_criterion = Or([MaxEpochs(1000),
+                         NoDecrease('valid_misclass', 200)])
     
     monitors = [LossMonitor(), MisclassMonitor(col_suffix='sample_misclass'),
                 CroppedTrialMisclassMonitor(
@@ -169,12 +169,12 @@ if __name__ == '__main__':
                         level=logging.DEBUG, stream=sys.stdout)
     # Should contain both .gdf files and .mat-labelfiles from competition
     data_folder = '/home/al/BCICIV_2a_gdf/'
-    subject_id = 9 # 1-9
-    low_cut_hz = 0 # 0 or 4
-    model = 'resnet' #'shallow' or 'deep' 
+    subject_id = 1 # 1-9
+    low_cut_hz = 4 # 0 or 4
+    model = 'deep' #'shallow' or 'deep' 
     cuda = True
     exp = run_exp(data_folder, subject_id, low_cut_hz, model, cuda)
     log.info("Last 10 epochs")
-    log.info("\n" + str(exp.epochs_df.iloc[-10:]))
-    print np.mean(exp.epochs_df.iloc[-10:]['test_misclass'])
-    print np.min(exp.epochs_df.iloc[-10:]['test_misclass'])
+    log.info("\n" + str(1-exp.epochs_df.iloc[-10:]))
+    print 1-np.mean(exp.epochs_df.iloc[-10:]['test_misclass'])
+    print 1-np.min(exp.epochs_df.iloc[-10:]['test_misclass'])

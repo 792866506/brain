@@ -119,7 +119,7 @@ test_accu=[]
 
 for i_epoch in range(50):
     i_trials_in_batch = get_balanced_batches(len(train_set.X), rng, shuffle=True,
-                                           batch_size=50)
+                                           batch_size=32)
     # Set model to training mode
     model.train()
     for i_trials in i_trials_in_batch :
@@ -230,7 +230,7 @@ for i_epoch in range(50):
 train_accu2=train_accu
 test_accu2=test_accu 
 '''
-def plot_accu(train_accu=train_accu,test_accu=test_accu,a=80):
+def plot_accu(train_accu=train_accu,test_accu=test_accu,a=650):
     import matplotlib.pyplot as plt
     plt.figure('accu')
     plt.xlabel('epoch')
